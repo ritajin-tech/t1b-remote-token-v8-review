@@ -7,6 +7,8 @@ v9 关键修正（回应 Tom 第七轮第 2 项）：
   本版改为：大小/哈希一律抓取【仓库 raw 实际分发字节】计算，并在推送后二次抓取逐文件自校验。
 
 v9.1 修正（回应 Tom 第八轮：交付说明引用了不在包内的脚本）：
+  另修一个同源隐患：构建时抓取"分发字节"原用 raw.githubusercontent.com，实测存在 CDN 缓存，
+  推送后仍返回旧版本字节，会让清单声明值再次与实际分发不一致。已改为 Contents API 取权威 blob。
   原 `verify` 依赖一份【不随包分发】的本地台账 `_manifest_hashes.json`，即使把脚本本身随包
   发出，审核人仍无法复跑。现已改为**离线自包含**：直接解析包内的 DELIVERY_MANIFEST_20260928.md
   取声明值，与同目录实际文件逐字节比对；不需要网络、不需要任何包外文件。
@@ -21,7 +23,7 @@ v9.1 修正（回应 Tom 第八轮：交付说明引用了不在包内的脚本�
 构建侧（Rita 本机，需网络）：
   python _build_manifest.py build              # 抓取分发字节 → 生成 ALL_IN_ONE + 清单
 """
-import hashlib, json, os, re, sys, time, urllib.parse, urllib.request
+import base64, hashlib, json, os, re, sys, time, urllib.parse, urllib.request
 
 D = "delivery_to_tom_20260928"
 REPO = "ritajin-tech/t1b-remote-token-v8-review"
@@ -57,18 +59,40 @@ NAMES = [f for f, _ in ORDER]
 DESC = dict(ORDER)
 
 
-def fetch_shipped(name, tries=10, delay=2.0):
-    """抓取【仓库实际分发的字节】（Tom 下载到的就是这个），带重试以应对 raw 缓存延迟。"""
-    url = RAW + urllib.parse.quote(name)
+API = "https://api.github.com/repos/%s/contents/" % REPO
+
+
+def _get(url, headers=None, timeout=30):
+    req = urllib.request.Request(url, headers=headers or {})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read()
+
+
+def fetch_shipped(name, tries=6, delay=2.0):
+    """抓取【仓库实际分发的字节】（审核人下载到的就是这个）。
+
+    必须用 Contents API 取权威 blob：实测 raw.githubusercontent.com 有 CDN 缓存，
+    推送后仍可能返回【旧版本】字节（本轮即踩到：API=22835 B 而 raw 仍给 21259 B），
+    会让清单声明值与实际分发不一致 —— 正是上一轮要修的那个问题。raw 仅作兜底。
+    """
     last = None
     for _ in range(tries):
         try:
-            with urllib.request.urlopen(url, timeout=30) as r:
-                return r.read()
+            j = json.loads(_get(API + urllib.parse.quote(name) + "?ref=" + BRANCH,
+                                {"Accept": "application/vnd.github+json",
+                                 "User-Agent": "t1b-manifest-builder"}))
+            if j.get("encoding") == "base64":
+                return base64.b64decode(j["content"])
+            if j.get("download_url"):
+                return _get(j["download_url"] + "?nocache=%d" % time.time())
         except Exception as e:
             last = e
             time.sleep(delay)
-    raise SystemExit("抓取分发字节失败: %s (%s)" % (name, last))
+    # 兜底：raw（带缓存击穿参数）
+    try:
+        return _get(RAW + urllib.parse.quote(name) + "?nocache=%d" % time.time())
+    except Exception as e:
+        raise SystemExit("抓取分发字节失败: %s (%s / %s)" % (name, last, e))
 
 
 def sums(b):
@@ -124,7 +148,10 @@ def build():
 ## 🔴 哈希口径（针对第七轮第 2 项，务必先读）
 
 - 往版清单直接对**本地文件**算 SHA-256。但 git 提交时会做 **CRLF→LF 换行转换**，导致"仓库实际分发的字节"与本地不同 —— 例如 `TEST_OUTPUT_20260928.txt` 本地 26,023 B / `5b8700…`，仓库实际分发 25,798 B / `1d4534…`，**差值 225 B 恰等于该文件行数**。实测同类偏差共影响 **7 个文件**。
-- **本版修正**：下表的大小与 SHA-256 **一律按仓库实际分发字节（raw 抓取）计算**，而非本地字节；生成后再次抓取逐文件比对做**自校验**。
+- **本版修正**：下表的大小与 SHA-256 **一律按仓库实际分发字节计算**，而非本地字节；生成后再次抓取逐文件比对做**自校验**。
+- **字节来源必须是 GitHub Contents API（权威 blob），不能用 raw 抓取**：本轮实测 raw.githubusercontent.com 存在 CDN 缓存，
+  推送后仍返回**旧版本**字节（`_build_manifest.py` 的 API 权威值 22,835 B，raw 却仍给 21,259 B）。
+  若用 raw 生成清单，声明值会再次与实际分发不一致 —— 等于重犯上一轮那个问题。故本包改用 API 取权威 blob，raw 仅作兜底。
 - 清单**不声明自身哈希**（避免自引用）；`ALL_IN_ONE_20260928.txt` 的哈希按其分发字节声明并已自校验。
 - 交付主体为本仓库；`ALL_IN_ONE_*.txt` 为单文件合集备用。
 - **一键核验（离线）**：`python _build_manifest.py verify` —— 脚本已在包内；它解析本清单的声明值并与同目录文件逐字节比对，输出逐行 PASS/FAIL，全部一致时退出码 0、任一不符退出码 1。**不需要网络，也不需要任何包外文件**（`--net` 可选，改为抓取仓库 raw 字节比对）。
