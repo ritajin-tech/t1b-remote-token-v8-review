@@ -14,6 +14,7 @@ v9.1 修正（回应 Tom 第八轮：交付说明引用了不在包内的脚本�
 
 用法（审核人侧，离线可跑）：
   python _build_manifest.py verify             # 比对【脚本所在目录】的文件与包内清单
+                                               # （zip 下载=LF 直接 PASS；Windows git clone=CRLF 时按 LF 归一比对并标注）
   python _build_manifest.py verify --dir DIR   # 指定交付目录
   python _build_manifest.py verify --net       # 可选：改为抓取仓库 raw 分发字节比对（需网络）
 
@@ -127,6 +128,9 @@ def build():
 - 清单**不声明自身哈希**（避免自引用）；`ALL_IN_ONE_20260928.txt` 的哈希按其分发字节声明并已自校验。
 - 交付主体为本仓库；`ALL_IN_ONE_*.txt` 为单文件合集备用。
 - **一键核验（离线）**：`python _build_manifest.py verify` —— 脚本已在包内；它解析本清单的声明值并与同目录文件逐字节比对，输出逐行 PASS/FAIL，全部一致时退出码 0、任一不符退出码 1。**不需要网络，也不需要任何包外文件**（`--net` 可选，改为抓取仓库 raw 字节比对）。
+- **换行形态**：清单声明的是**仓库存储字节（LF）**。经 GitHub「Download ZIP」下载即为 LF，核验直接 `PASS`；
+  若在 Windows 上用 `git clone` 检出（默认 `core.autocrlf=true` 会转成 CRLF，字节数 += 行数），脚本会再按 CRLF→LF 归一比对一次，
+  命中则显示 `PASS(LF归一)` 并给出说明。两种形态都视为一致，但**不会静默兜底**：若归一后仍不符，即为 `FAIL`。
 
 ---
 
@@ -264,20 +268,37 @@ def verify(use_net=False, vdir=None):
     print("比对源：%s" % src)
     print("%-42s %10s %10s  %s" % ("文件", "声明B", "实际B", "结果"))
     ok = True
+    n_lf = 0
     for f in files:
         exp = declared.get(f)
         try:
-            b = fetch_shipped(f) if use_net else open(os.path.join(vdir, f), "rb").read()
+            raw = fetch_shipped(f) if use_net else open(os.path.join(vdir, f), "rb").read()
         except Exception:
             print("%-42s %10s %10s  MISSING_FILE" % (f, exp[0] if exp else "-", "-"))
             ok = False
             continue
-        got_s, got_h = len(b), hashlib.sha256(b).hexdigest()
         if exp is None:
-            print("%-42s %10s %10d  MISSING_DECL" % (f, "-", got_s)); ok = False; continue
-        good = (exp[0] == got_s and exp[1] == got_h)
+            print("%-42s %10s %10d  MISSING_DECL" % (f, "-", len(raw))); ok = False; continue
+        # 声明值 = 仓库存储字节（LF）。zip 下载保持 LF，可直接命中；
+        # 但 Windows 上 `git clone` 会按 core.autocrlf 检出为 CRLF（字节数=+行数），
+        # 故再按 LF 归一比对一次，并如实标注命中方式（不做静默兜底）。
+        if len(raw) == exp[0] and hashlib.sha256(raw).hexdigest() == exp[1]:
+            tag, good = "PASS", True
+        elif not use_net:
+            lf = raw.replace(b"\r\n", b"\n")
+            if len(lf) == exp[0] and hashlib.sha256(lf).hexdigest() == exp[1]:
+                tag, good = "PASS(LF归一)", True
+                n_lf += 1
+            else:
+                tag, good = "FAIL", False
+        else:
+            tag, good = "FAIL", False
         ok = ok and good
-        print("%-42s %10d %10d  %s" % (f, exp[0], got_s, "PASS" if good else "FAIL"))
+        print("%-42s %10d %10d  %s" % (f, exp[0], len(raw), tag))
+    if n_lf:
+        print("\n注：%d 个文件按原始字节不符、经 CRLF→LF 归一后一致 —— 说明你的工作区按 CRLF 检出"
+              "（Windows 默认 core.autocrlf=true）。清单声明的是仓库存储字节（LF）；"
+              "经 GitHub「Download ZIP」下载即为 LF，可直接命中原始字节。" % n_lf)
     print("\nVERIFY: %s（共 %d 项）" % ("ALL PASS" if ok else "HAS FAILURE", len(files)))
     sys.exit(0 if ok else 1)
 
