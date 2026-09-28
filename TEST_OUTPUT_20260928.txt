@@ -1,0 +1,225 @@
+# TEST_OUTPUT_20260928.txt — 本机真实执行原始输出（未删改）
+
+## Python rotation_logic_test.py（期望 PASS 119/119，退出码 0；缺 deployment_evidence_20260926.json 时退出码 2 且不输出裁决）
+
+PASS - T1 正常轮换成功（内层载荷可解析） | {'ok': True, 'rotated': True, 'counter': 1, 'request_id': 'req_1700000000000'}
+PASS - T1b 计数自增 0→1 / 令牌已切 NEW 
+PASS - T1c capability 用过即焚 
+PASS - T1d 在途标记已清除（finally） 
+PASS - T2 重放被拒（capability 已消费） | {"ok": false, "error": "capability \u5df2\u6d88\u8d39\u6216\u672a\u8bbe\u7f6e"}
+PASS - T2b 重放后令牌未被改 
+PASS - T3 旧值不符被拒 | {"ok": false, "error": "\u5f53\u524d\u4ee4\u724c\u4e0e\u9884\u671f\u65e7\u503c\u4e0d\u7b26\uff0c\u5df2\u4e2d\u6b62\uff1bcapability \u5df2\u4f5c\u5e9f"}
+PASS - T3b 旧值不符后 capability 作废 
+PASS - T3c 令牌未被改（仍 NEW） 
+PASS - T4 无效 nonce 被拒 | {"ok": false, "error": "capability \u65e0\u6548"}
+PASS - T4b 无效 nonce 时 capability 保留 
+PASS - T5 用当前生效令牌查询状态 → 指纹匹配 NEW | {'ok': True, 'counter': 1, 'token_fingerprint': '3619e2654e3d76ddcae039bd25b4103eae8cdc20a27e2908f5acb80c95537fb8', 'inflight': False, 'inflight_id': None, 'nonce_present': True, 'capability_age_ms': 0, 'owner_fingerprint': '76ba72a163e9'}
+PASS - T5b 用已失效的 OLD 查询 → 被令牌门拒绝（鉴权未跳过） 
+PASS - T5c 无令牌查询 → 被令牌门拒绝 
+PASS - T6 未轮换时指纹匹配 OLD | {'ok': True, 'counter': 0, 'token_fingerprint': '9aae1c8ed1d7cafbc24b46977962b90ea79d0999dd1bba8694682b31d1a9a38d', 'inflight': False, 'inflight_id': None, 'nonce_present': True, 'capability_age_ms': 0, 'owner_fingerprint': '76ba72a163e9'}
+PASS - T7 部署证据条目数 = 16（与枚举一致） | 实际=16
+PASS - T7b 无任何部署钉在临时版 v144 | 版本列表=[None, 28, 126, 30, 26, 113, 66, 27, 112, 29, 65, 127, 31, 136, 67, 129]
+PASS - T7c 生产 Web App 在 HEAD 且 clean 
+PASS - T7d 证据含采集时点与只读方法 
+PASS - T8 服务端代码无任何日志调用 | 命中=[]
+PASS - T8b 服务端不含 64+ 位疑似真实令牌（真实正则扫描，非恒真） 
+PASS - T8c 处理函数按合约 return JSON.stringify（非 _rtResponse） 
+PASS - T8d 服务端置位/清除 rotation_inflight（finally 必清） 
+PASS - T8e 服务端校验 capability 归属 owner（不匹配则拒绝且不消费） 
+PASS - T8f 取消无条件 force（仅同 owner / 超 TTL / 显式覆盖） 
+PASS - T8g 客户端写【token】字段并同步历史别名 
+PASS - T8h 客户端无硬编码令牌/URL 常量 
+PASS - T8i 客户端按合约解析 message 内层载荷 
+PASS - T8j 客户端终判需两次稳定观测（防竞态误判） 
+PASS - T8k 客户端显式收紧并核验文件权限（0300 相关符号齐全） 
+PASS - T8l 服务端消费时强制校验 capability TTL（过期拒绝且不改令牌） 
+PASS - T8m 客户端 ACL 读回失败/空/无法解析统一按失败关闭 
+PASS - T9 成功路径→返回 rotated | {'result': 'rotated', 'counter': 1, 'new_token_sha256': 'fecff9692c38de2251aba910fbd66cd12edecdf3267567b3dbe71f84152d6505'}
+PASS - T9b 本地配置 token 字段被写为 NEW | {'result': 'rotated', 'counter': 1, 'new_token_sha256': 'fecff9692c38de2251aba910fbd66cd12edecdf3267567b3dbe71f84152d6505'}
+PASS - T9c 服务端令牌已切 NEW 
+PASS - T9d 暂存已清除 
+PASS - T10 历史别名一并同步（避免读旧字段） 
+PASS - T10b 本地配置无残留旧值 
+PASS - T11 响应丢失→确认 NEW 已生效 | {'result': 'confirmed_new', 'counter': 1, 'new_token_sha256': 'fecff9692c38de2251aba910fbd66cd12edecdf3267567b3dbe71f84152d6505', 'observations': [{'observed': 'new', 'inflight': False, 'counter': 1}]}
+PASS - T11b confirmed_new→本地写入 NEW 
+PASS - T12 拒绝路径→本地仍为 OLD | {'result': 'rejected', 'error': 'capability 无效', 'foreign': False}
+PASS - T12b 拒绝路径→返回 rejected | {'result': 'rejected', 'error': 'capability 无效', 'foreign': False}
+PASS - T12c 服务端令牌未变 
+PASS - T12d 暂存已清除（NEW 从未生效） 
+PASS - T13 未知路径→本地仍为 OLD 
+PASS - T13b 返回 still_unknown | no_stable_observation
+PASS - T13c 暂存保留 NEW 
+PASS - T14 持久化失败→rotated_server_but_persist_failed | {'result': 'rotated_server_but_persist_failed', 'counter': 1, 'escrow': 'C:\\Users\\rita.jin\\AppData\\Local\\Temp\\tmp2
+PASS - T14b 服务端确已切 NEW 
+PASS - T14c NEW 仍在受保护暂存 
+PASS - T14d 返回不含 NEW 明文 
+PASS - T15 --recover 补写成功 | {'result': 'recovered', 'counter': 1, 'new_token_sha256': 'fecff9692c38de2251aba910fbd66cd12edecdf3267567b3dbe71f84152d6505'}
+PASS - T15b 恢复后本地 = NEW 
+PASS - T15c 恢复后暂存已清除 
+PASS - T16 暂存值未生效时拒绝恢复 
+PASS - T17 在途时→返回 still_unknown（reason=inflight） | {'result': 'still_unknown', 'reason': 'inflight', 'escrow': 'C:\\Users\\rita.jin\\AppData\\Local\\Temp\\tmp2m8d785b\\escrow\\escrow_20260928T105339_pi
+PASS - T17b 在途时→绝不判定 confirmed_old_unrotated | still_unknown
+PASS - T17c 在途时→暂存仍存在且为 armed（NEW 未被删） | C:\Users\rita.jin\AppData\Local\Temp\tmp2m8d785b\escrow\escrow_20260928T105339_pid2944_f97ef1a6.json
+PASS - T17d 在途时→本地配置仍为 OLD（未交接） 
+PASS - T17e 观测记录含 inflight=True | [{'observed': 'old', 'inflight': True, 'counter': 0}]
+PASS - T17f 在途请求落地后→可从暂存恢复 NEW | {'result': 'recovered', 'counter': 1, 'new_token_sha256': 'fecff9692c38de2251aba910fbd66cd12edecdf3267567b3dbe71f84152d6505'}
+PASS - T17g 恢复后本地 = NEW 
+PASS - T18 无在途且连续两次稳定观测仍为 OLD → confirmed_old_unrotated | {'result': 'confirmed_old_unrotated', 'counter': 0, 'escrow': 'C:\\Users\\rita.jin\\AppData\\Local\\Temp\\tmp2m8d785b\\escrow\\escrow_20260928T105341_
+PASS - T18b 终判前至少做过 2 次观测（单次不终判） | [{'observed': 'old', 'inflight': False, 'counter': 0}, {'observed': 'old', 'inflight': False, 'counter': 0}]
+PASS - T18c 终判后暂存**保留**且标记为 abandoned（不静默删除） | C:\Users\rita.jin\AppData\Local\Temp\tmp2m8d785b\escrow\escrow_20260928T105341_pid2944_1f3fc1b2.json
+PASS - T18d 本地配置仍为 OLD 
+PASS - T19 基线：无在途时热装成功 | {'ok': True, 'capability_set': True, 'nonce_present': True, 'nonce_hash_fingerprint': '6ccec6998aa4', 'owner_fingerprint': 'e648b94b9562'}
+PASS - T19b 在途时热装被拒（inflight=True） | {'ok': False, 'error': '有轮换请求在途，拒绝设置/覆盖 capability', 'inflight': True}
+PASS - T19c 在途时已有 capability 未被改动 
+PASS - T20 同 owner 幂等重设允许 | {'ok': True, 'capability_set': True, 'nonce_present': True, 'nonce_hash_fingerprint': '0805809997e7', 'owner_fingerprint': '762f0d20ecfc'}
+PASS - T20b 他人新鲜 capability → 默认拒绝覆盖（foreign） | {'ok': False, 'error': 'capability 已存在且属于另一笔操作，未覆盖', 'nonce_present': True, 'foreign': True, 'capability_age_ms': 0}
+PASS - T20c 拒绝时原 capability 未变（仍是 owner_CCC 的哈希） 
+PASS - T20d 显式 force_over_foreign=true → 允许覆盖 | {'ok': True, 'capability_set': True, 'nonce_present': True, 'nonce_hash_fingerprint': 'e6a100a7708c', 'owner_fingerprint': '10e6701ba6df'}
+PASS - T20e 已超 TTL（陈旧）→ 无需显式覆盖即可重建 | {'ok': True, 'capability_set': True, 'nonce_present': True, 'nonce_hash_fingerprint': '41083597b832', 'owner_fingerprint': '100f08d9ae8a'}
+PASS - T21 owner 不匹配→拒绝 | {'ok': False, 'error': 'capability 归属不匹配（或缺失），已中止（未消费该 capability）', 'foreign': True}
+PASS - T21b owner 不匹配→不消费该 capability（哈希仍在） 
+PASS - T21c 令牌未被改 
+PASS - T22 轮换成功且本地已写入 NEW | {'result': 'rotated', 'counter': 1, 'new_token_sha256': 'fecff9692c38de2251aba910fbd66cd12edecdf3267567b3dbe71f84152d650
+PASS - T22b 临时文件与最终文件都被显式收紧过（含 .tmp） | ['escrow_20260928T105343_pid2944_9ea9b83a.json', 'cred.json.tmp', 'cred.json']
+PASS - T22c 无 .tmp 残留 
+PASS - T22d Windows：chmod 0600 + ACL 收紧成功 | Windows：chmod 0600 + ACL 已核验（仅剩主体 rita.jin）
+PASS - T22d2 Windows：读回 ACL 核验仅剩本用户（无 SYSTEM/Administrators/Everyone） | []
+PASS - T22e 暂存文件 ACL 仅剩本用户（读回核验） | []
+PASS - T23 权限核验失败→rotated_server_but_persist_failed | {'result': 'rotated_server_but_persist_failed', 'counter': 1, 'escrow': 'C:\\Users\\rita.jin\\AppData\\Local\\Temp\\tmp2m8d785b\\escrow\\escrow_202609
+PASS - T23b 权限核验失败→本地配置未被写入 NEW（仍 OLD） 
+PASS - T23c 权限核验失败→NEW 仍在暂存（可 --recover） 
+PASS - T23d 服务端确已切 NEW（失败发生在本地持久化环节） 
+PASS - T23e 修正权限后可从暂存恢复 | {'result': 'recovered', 'counter': 1, 'new_token_sha256': 'fecff9692c38de2251aba910fbd66cd12edecdf3267567b3dbe71f84152d6505'}
+PASS - T24 ACL 读回失败（rc!=0/空）→ 抛 PermissionHardeningError（失败关闭，绝不误判为仅本用户） 
+PASS - T24b restrict_perms（Windows 分支）遇 ACL 读回失败→抛 PermissionHardeningError（留不下权限过宽文件） 
+PASS - T24c ACL 读回 rc=0 但结果为空→失败关闭（不误判为仅本用户） 
+PASS - T25 遗留 capability（owner 空）→ 拒绝（foreign） | {'ok': False, 'error': 'capability 归属不匹配（或缺失），已中止（未消费该 capability）', 'foreign': True}
+PASS - T25b 遗留 capability 未被消费（哈希仍在、令牌未改） 
+PASS - T26 延迟请求：capability 已过期→拒绝（expired） | {'ok': False, 'error': 'capability 已过期，拒绝轮换（请重新热装 capability）', 'expired': True}
+PASS - T26b 延迟请求：令牌未被改（仍 OLD_MOCK） 
+PASS - T26c 延迟请求：过期 capability 已清理（无法被后续延迟请求复用） 
+PASS - T26d 创建时间缺失→拒绝（expired） | {'ok': False, 'error': 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）', 'expired': True}
+PASS - T26d 创建时间缺失：令牌未被改（仍 OLD_MOCK） 
+PASS - T26d 创建时间缺失：capability 已清理（无法被复用） 
+PASS - T26e 创建时间为 0→拒绝（expired） | {'ok': False, 'error': 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）', 'expired': True}
+PASS - T26e 创建时间为 0：令牌未被改（仍 OLD_MOCK） 
+PASS - T26e 创建时间为 0：capability 已清理 
+PASS - T26f 创建时间格式错误→拒绝（expired） | {'ok': False, 'error': 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）', 'expired': True}
+PASS - T26f 创建时间格式错误：令牌未被改（仍 OLD_MOCK） 
+PASS - T26f 创建时间格式错误：capability 已清理 
+PASS - T26h 创建时间带数字后缀(1700000000000x)→拒绝（expired） | {'ok': False, 'error': 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）', 'expired': True}
+PASS - T26h 数字后缀：令牌未被改（仍 OLD_MOCK） 
+PASS - T26h 数字后缀：capability 已清理 
+PASS - T26i 创建时间为小数(123.456)→拒绝（expired） | {'ok': False, 'error': 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）', 'expired': True}
+PASS - T26i 小数：令牌未被改（仍 OLD_MOCK） 
+PASS - T26i 小数：capability 已清理 
+PASS - T26j 创建时间为科学记数法(1.7e12)→拒绝（expired） | {'ok': False, 'error': 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）', 'expired': True}
+PASS - T26j 科学记数法：令牌未被改（仍 OLD_MOCK） 
+PASS - T26j 科学记数法：capability 已清理 
+PASS - T26k 创建时间为未来时间戳→拒绝（expired） | {'ok': False, 'error': 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）', 'expired': True}
+PASS - T26k 未来时间戳：令牌未被改（仍 OLD_MOCK） 
+PASS - T26k 未来时间戳：capability 已清理 
+PASS - T26g 创建时间有效且未过期→允许轮换 | {'ok': True, 'rotated': True, 'counter': 1, 'request_id': 'req_1000000'}
+PASS - T26g 正向对照：令牌已切为新值 
+
+=== 结果 ===
+PASS 119 / 119
+输入：deployment_evidence_20260926.json（真实只读枚举，count=16，采集于 2026-09-26T14:44:48.444Z）
+范围：逻辑层仿真 + 源码静态断言 + 竞态/权限/并发负向用例；无网络、无真实令牌、未触生产。
+这不构成生产轮换放行；真实执行须经 Rita / 生产负责人单独授权。
+
+PYTHON_EXIT=0
+
+## Node dispatch_sim_test.js（期望 PASS 85/85，退出码 0；用生产真实 RemoteTrigger.gs + 真实 doPost 原文仿真）
+
+PASS - A1 POST body 被解析并挂到 e.postBody（capability 热装成功）  | "{\"ok\":true,\"capability_set\":true,\"nonce_present\":true,\"capability_ttl_ms\":600000,\"nonce_hash_fingerprint\":\"8a734eb87536\",\"owner_fingerprint\":\"50e0b2a3ae86\"}"
+PASS - A2 token 取自 POST body（URL 无任何参数亦可通过门）  | {"ok":true,"action":"rotationstatus","version":"RT1.0","ts":"2026-09-28 12:00:00","message":"{\"ok\":true,\"counter\":0,\"token_fingerprint\":\"e9c76cd831e0e909e344c9925cfabcb652d49fe42e93595b721f9d8c5b9a54fc\",\"inflight\":false,\"inflight_id\":null,\"nonce_present\":false,\"capability_age_ms\":null,\"owner_fingerprint\":null}"}
+PASS - A3 非法 JSON body → ok:false + invalid JSON body  | {"ok":false,"error":"invalid JSON body: Expected property name or '}' in JSON at position 1 (line 1 column 2)"}
+PASS - A4 body 无 action → 分发器让位（_rtMaybeHandlePost 返回 null）  | null
+PASS - A4b 随后由【既有】doPost 自身兜底（no action in POST body），未被分发器劫持  | {"ok":false,"error":"no action in POST body"}
+PASS - B1 错误令牌 → 外层 ok:false + Invalid or missing token  | {"ok":false,"error":"Invalid or missing token","ts":"2026-09-28 12:00:00"}
+PASS - B1b 错误令牌 → 处理函数未执行（capability 未被消费）  | nonce_hash 仍在
+PASS - B2 缺 token → 拒绝  | {"ok":false,"error":"Invalid or missing token","ts":"2026-09-28 12:00:00"}
+PASS - B3 正确旧令牌 → 通过门并完成轮换  | {"ok":true,"action":"rotateremotetoken","version":"RT1.0","ts":"2026-09-28 12:00:00","message":"{\"ok\":true,\"rotated\":true,\"counter\":1,\"request_id\":\"req_1000000\"}"}
+PASS - B4 轮换后用 OLD 查询状态 → 被门拒绝（旧值确已失效）  | {"ok":false,"error":"Invalid or missing token","ts":"2026-09-28 12:00:00"}
+PASS - C1 camelCase "rotationStatus" 命中真实处理函数  | "{\"ok\":true,\"counter\":3,\"token_fingerprint\":\"9982fd5087fc9eba102e9b2d1d926e189acdafa08c4e0ca633dafb6db1037238\",\"inflight\":false,\"inflight_id\":null,\"nonce_present\":false,\"capability_age_ms\":null,\"owner_fingerprint\":null}"
+PASS - C2 下划线 "rotation_status" → unknown action（证明下划线不会被吃掉）  | "unknown action: rotation_status. available: status, _seturl, refreshqs, exception, archive, setup, setupAmy, testAmySelf, cleanupLeaves, syncLeaves, checkLeaves, readRange, appendRows, patchCells, snapshot, trimblank, dupreport, driveList, purgeSoftLeaves, purgeRows, probeCalendar, rotationStatus, setRotationCapability, rotateRemoteToken"
+PASS - C3 全小写 "rotationstatus" 命中（大小写不敏感查找生效）  | "{\"ok\":true,\"counter\":3,\"token_fingerprint\":\"9982fd5087fc9eba102e9b2d1d926e189acdafa08c4e0ca633dafb6db1037238\",\"inflight\":false,\"inflight_id\":null,\"nonce_present\":false,\"capability_age_ms\":null,\"owner_fingerprint\":null}"
+PASS - D1 既有 action（driveList）仍被正确路由  | "{\"ok\":true,\"stub\":\"driveList\"}"
+PASS - D1b 既有 action 未被误触发其它分支  | 调用次数=1
+PASS - D2 内置 status 仍可用且列出全部动作  | 24
+PASS - D2b status 列表包含新增 3 个动作  | ["rotationStatus","setRotationCapability","rotateRemoteToken"]
+PASS - D2c 动作总数 = 内置2 + 注册表22 = 24  | 实际=24
+PASS - D3 未知 action → unknown action 提示（不报错、不影响其它）  | "unknown action: nosuchaction. available: status, _seturl, refreshqs, exception, archive, setup, setupAmy, testAmySelf, cleanupLeaves, syncLeaves, checkLeaves, readRange, appendRows, patchCells, snapshot, trimblank, dupreport, driveList, purgeSoftLeaves, purgeRows, probeCalendar, rotationStatus, setRotationCapability, rotateRemoteToken"
+PASS - D4 既有约定复现：返回对象会被 String() 变成 [object Object]（故必须返 JSON 字符串）  | "[object Object]"
+PASS - E1a capability 热装成功（无需进编辑器手填）  | "{\"ok\":true,\"capability_set\":true,\"nonce_present\":true,\"capability_ttl_ms\":600000,\"nonce_hash_fingerprint\":\"8a734eb87536\",\"owner_fingerprint\":\"50e0b2a3ae86\"}"
+PASS - E1b 成功路径：外层 ok=true 且 message 是可解析 JSON 字符串  | {"ok":true,"action":"rotateremotetoken","version":"RT1.0","ts":"2026-09-28 12:00:00","message":"{\"ok\":true,\"rotated\":true,\"counter\":1,\"request_id\":\"req_1000000\"}"}
+PASS - E1c 成功路径：rotated=true / counter=1 / 令牌已切 NEW  | {"ok":true,"rotated":true,"counter":1,"request_id":"req_1000000"}
+PASS - E1d capability 用过即焚  | 已删除
+PASS - E1e 在途标记已清除（finally）  | 已清除
+PASS - E2 重放被拒（capability 已消费）  | "{\"ok\":false,\"error\":\"capability 已消费或未设置\"}"
+PASS - E2b 重放后令牌未被改
+PASS - E3 旧值不符被拒  | "{\"ok\":false,\"error\":\"当前令牌与预期旧值不符，已中止；capability 已作废\"}"
+PASS - E3b 旧值不符后 capability 已作废
+PASS - E3c 旧值不符后在途标记已清除
+PASS - E3d 令牌未被改（仍 OLD）
+PASS - E4 无效 nonce 被拒  | "{\"ok\":false,\"error\":\"capability 无效\"}"
+PASS - E4b 无效 nonce 时 capability 保留
+PASS - E5a 缺 expected_old → 拒  | "{\"ok\":false,\"error\":\"expected_old 与当前令牌不符，拒绝热装 capability\"}"
+PASS - E5b 非法 nonce_hash → 拒  | "{\"ok\":false,\"error\":\"nonce_hash 必须是 64 位小写十六进制 SHA-256\"}"
+PASS - E5c 缺 owner_id → 拒（防覆盖他人在途操作）  | "{\"ok\":false,\"error\":\"缺少 owner_id（用于防止覆盖他人在途操作）\"}"
+PASS - E5d 同 owner 幂等重设允许  | "{\"ok\":true,\"capability_set\":true,\"nonce_present\":true,\"capability_ttl_ms\":600000,\"nonce_hash_fingerprint\":\"00f0993c42cb\",\"owner_fingerprint\":\"50e0b2a3ae86\"}"
+PASS - E5e 他人新鲜 capability → 默认拒绝覆盖（foreign）  | "{\"ok\":false,\"error\":\"capability 已存在且属于另一笔操作，未覆盖；确认其已作废后带 force_over_foreign=true 重试\",\"nonce_present\":true,\"foreign\":true,\"capability_age_ms\":0}"
+PASS - E5f 拒绝时原 capability 未变  | 仍为 owner 的 n2
+PASS - E5g 显式 force_over_foreign=true → 允许覆盖  | "{\"ok\":true,\"capability_set\":true,\"nonce_present\":true,\"capability_ttl_ms\":600000,\"nonce_hash_fingerprint\":\"d9bf42778f66\",\"owner_fingerprint\":\"6b86c270b093\"}"
+PASS - E5h 已超 TTL（陈旧）→ 无需显式覆盖即可重建  | "{\"ok\":true,\"capability_set\":true,\"nonce_present\":true,\"capability_ttl_ms\":600000,\"nonce_hash_fingerprint\":\"e6a100a7708c\",\"owner_fingerprint\":\"47c20225bdb0\"}"
+PASS - E6 指纹 = sha256(token|counter) 与客户端算法一致  | 4c0f6715bfc7b67f0f805c889169184bc65efc1e0fd688e3e28d654ade728bca
+PASS - E6b 状态查询不泄露令牌原文  | {"ok":true,"counter":7,"token_fingerprint":"4c0f6715bfc7b67f0f805c889169184bc65efc1e0fd688e3e28d654ade728bca","inflight":false,"inflight_id":null,"nonce_present":false,"capability_age_ms":null,"owner_fingerprint":null}
+PASS - E6c 状态含 inflight 字段（客户端据此不得终判"未轮换"）  | false
+PASS - F1 在途时设置 capability 被拒（inflight=true）  | {"ok":false,"error":"有轮换请求在途，拒绝设置/覆盖 capability","inflight":true}
+PASS - F1b 在途时已有 capability 未被改动
+PASS - F2 在途时第二个轮换请求被拒  | {"ok":false,"error":"已有轮换请求在途，本次未执行","inflight":true}
+PASS - F2b 在途时令牌未被改
+PASS - F3 owner 不匹配→拒绝  | {"ok":false,"error":"capability 归属不匹配（或缺失），已中止（未消费该 capability）","foreign":true}
+PASS - F3b owner 不匹配→不消费该 capability（哈希仍在）
+PASS - F3c 令牌未被改
+PASS - F4 在途时状态查询返回 inflight=true + inflight_id  | {"ok":true,"counter":0,"token_fingerprint":"e9c76cd831e0e909e344c9925cfabcb652d49fe42e93595b721f9d8c5b9a54fc","inflight":true,"inflight_id":"req_123","nonce_present":false,"capability_age_ms":null,"owner_fingerprint":null}
+PASS - F4b 在途时指纹仍对应旧令牌（不得据此判定未轮换）  | e9c76cd831e0e909e344c9925cfabcb652d49fe42e93595b721f9d8c5b9a54fc
+PASS - F5 状态含 owner_fingerprint 且不等于 owner 原文  | "50e0b2a3ae86"
+PASS - F5b owner_fingerprint = sha256(owner)[:12]  | 50e0b2a3ae86
+PASS - F6 遗留 capability（owner 空）→ 拒绝（foreign）  | {"ok":false,"error":"capability 归属不匹配（或缺失），已中止（未消费该 capability）","foreign":true}
+PASS - F6b 遗留 capability 未被消费（哈希仍在、令牌未改）  | ["6d53465363f021d0907c11dc72ca259f9089a2ce85b1d63c5be14a9a11524a38","OLD_MOCK_TOKEN"]
+PASS - F7 延迟请求：capability 已过期→拒绝（expired）  | {"ok":false,"error":"capability 已过期，拒绝轮换（请重新热装 capability）","expired":true}
+PASS - F7b 延迟请求：令牌未被改（仍 OLD）
+PASS - F7c 延迟请求：过期 capability 已清理（无法被后续延迟请求复用）
+PASS - F7d 创建时间缺失→拒绝（expired）  | {"ok":false,"error":"capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）","expired":true}
+PASS - F7d 创建时间缺失：令牌未被改（仍 OLD）
+PASS - F7d 创建时间缺失：capability 已清理（无法被复用）
+PASS - F7e 创建时间为 0→拒绝（expired）  | {"ok":false,"error":"capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）","expired":true}
+PASS - F7e 创建时间为 0：令牌未被改（仍 OLD）
+PASS - F7e 创建时间为 0：capability 已清理
+PASS - F7f 创建时间格式错误→拒绝（expired）  | {"ok":false,"error":"capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）","expired":true}
+PASS - F7f 创建时间格式错误：令牌未被改（仍 OLD）
+PASS - F7f 创建时间格式错误：capability 已清理
+PASS - F7g 创建时间有效且未过期→允许轮换  | {"ok":true,"rotated":true,"counter":1,"request_id":"req_1000000"}
+PASS - F7g 正向对照：令牌已切为新值
+PASS - F7h 创建时间带数字后缀→拒绝（expired）  | {"ok":false,"error":"capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）","expired":true}
+PASS - F7h 创建时间带数字后缀：令牌未被改（仍 OLD）
+PASS - F7h 创建时间带数字后缀：capability 已清理
+PASS - F7i 创建时间为小数→拒绝（expired）  | {"ok":false,"error":"capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）","expired":true}
+PASS - F7i 创建时间为小数：令牌未被改（仍 OLD）
+PASS - F7i 创建时间为小数：capability 已清理
+PASS - F7j 创建时间为科学记数法→拒绝（expired）  | {"ok":false,"error":"capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）","expired":true}
+PASS - F7j 创建时间为科学记数法：令牌未被改（仍 OLD）
+PASS - F7j 创建时间为科学记数法：capability 已清理
+PASS - F7k 创建时间为未来时间戳→拒绝（expired）  | {"ok":false,"error":"capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）","expired":true}
+PASS - F7k 创建时间为未来时间戳：令牌未被改（仍 OLD）
+PASS - F7k 创建时间为未来时间戳：capability 已清理
+PASS - F7l 创建时间为干净正整数时间戳→允许轮换  | {"ok":true,"rotated":true,"counter":1,"request_id":"req_3000000"}
+PASS - F7l 正向对照：令牌已切为新值
+
+=== 结果 ===
+PASS 85 / 85
+范围：用真实 RemoteTrigger.gs / 真实 doPost / 拟部署处理函数原文在 Node 中仿真；无网络、无真实令牌、未触生产。
+
+NODE_EXIT=0

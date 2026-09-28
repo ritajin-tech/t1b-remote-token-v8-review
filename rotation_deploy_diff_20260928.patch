@@ -1,0 +1,46 @@
+# REMOTE_TOKEN 轮换 —— 拟部署代码差异（ts-manager GAS 项目）
+# 生成日期：2026-09-28（v5；注册表 3 行与 v4 相同，服务端逻辑升级见 rotation_action_actual.gs v5）
+# 范围：① RemoteActions.gs 注册表新增 3 行（下方 unified diff）
+#      ② 新增文件 RotationActions.gs（全文见 rotation_action_actual.gs 第 2 节，v5 含在途标记与归属校验）
+#      ③ Code.gs / RemoteTrigger.gs 【零改动】—— 见下方证据
+#
+# 源文件（2026-09-27 只读拉取的真实 HEAD 副本）SHA-256（LF 归一化）：
+#   RemoteActions.gs  2a9f57f612b47d27a7e4d0e8117f017fdc463f089fbdc919967d4240aa0f27ea
+#   RemoteTrigger.gs  9064d772cb89bf98796dba03b331914e4dcbd4e3109daefca1932c1921ae960e
+#   Code.gs           ab852569f16a6582499df728c2c24a73ed704451a48f2011aa7bb9667f451aa9
+# 打补丁后 RemoteActions.gs SHA-256（LF 归一化）：1d2438a64756980267b00604b6c7da6db9df048d07c2fce5e66087492464adc4
+#   ※ Windows git 默认 core.autocrlf=true 检出后会变成 CRLF，字节哈希不同但内容逐字节相同；
+#     比对请用 LF 归一化哈希，或 `git -c core.autocrlf=false apply`。
+#
+# 证据 1：既有 doPost 已接入 POST 分发，无需改动（Code.gs 第 135-140 行）
+#   function doPost(e) {
+#     var r = _rtMaybeHandlePost(e);
+#     if (r) return r;
+#     return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'no action in POST body' }))
+#   }
+# 证据 2：分发器对 action 处理函数的返回做 String() 强转（RemoteTrigger.gs 第 80-81 行）
+#   var out = REMOTE_ACTIONS[_rtKey](e);
+#   if (out !== undefined && out !== null) result.message = String(out);
+#   ⇒ 处理函数必须 return JSON.stringify({...}) 字符串
+# 证据 3：令牌门在分发器内（RemoteTrigger.gs 第 40-61 行）
+#
+# 本机验证记录：
+#   git apply --check -p1 rotation_deploy_diff_20260928.patch        → PASS
+#   git apply      -p1 rotation_deploy_diff_20260928.patch           → 应用成功，哈希与上表一致（忽略 CR）
+#   node dispatch_sim_test.js（真实分发源码仿真）                    → 55/55 PASS，exit 0
+#   python rotation_logic_test.py（逻辑仿真 + 竞态/权限/并发负向）   → 86/86 PASS，exit 0
+# 生产应用须经 Rita / 生产负责人单独授权后，由授权人员执行。
+--- a/ts-manager/RemoteActions.gs
++++ b/ts-manager/RemoteActions.gs
+@@ -22,7 +22,10 @@
+   driveList:     function(e) { return tsDriveList(e); },      // V4.3.65 列出周存档文件夹里的备份文件（只读）
+   purgeSoftLeaves: function(e) { return tsPurgeSoftLeaves(e); }, // V4.3.68 清「软删+休假类」假条行
+   purgeRows:      function(e) { return tsPurgeRows(e); },      // V4.3.69 物理删「指定UUID集合」或软删行（清理过量恢复残留）
+-  probeCalendar: function(e) { return tsProbeCalendar(e); }    // V4.3.72 只读读 China Employee Leave Calendar，核对表里请假行 vs 日历真值
++  probeCalendar: function(e) { return tsProbeCalendar(e); },  // V4.3.72 只读读 China Employee Leave Calendar，核对表里请假行 vs 日历真值
++  rotationStatus:        function(e) { return tsRotationStatus(e); },        // 只读状态查询（结果未知时独立确认用）
++  setRotationCapability: function(e) { return tsSetRotationCapability(e); }, // 一次性能力热装（写 SHA-256(nonce)）
++  rotateRemoteToken:     function(e) { return tsRotateRemoteToken(e); },     // 执行轮换（锁内先删后做）
+ };
+ 
+ // ============================================================
