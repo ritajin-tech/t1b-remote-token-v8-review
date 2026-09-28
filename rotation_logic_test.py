@@ -91,11 +91,11 @@ def srv_dispatch(body):
 
 
 def strict_pos_int(raw, now):
-    """严格解析正整数毫秒时间戳：仅纯数字串、>0、不超 safe-integer、非未来；否则 None。
-    对应 gs 服务端 _parseStrictPositiveInt（v8 对 v7 的修正）。"""
+    """严格解析正整数毫秒时间戳：仅纯数字串（v9 起不做 strip，前后空白非法）、>0、不超 safe-integer、非未来；否则 None。
+    对应 gs 服务端 _parseStrictPositiveInt（v8 修正解析；v9 再移除 trim/strip）。"""
     if raw is None:
         return None
-    s = str(raw).strip()
+    s = str(raw)  # v9：【不做 strip】—— 任何前导/尾随空白一律非法（失败关闭）
     if not re.fullmatch(r'[0-9]+', s):
         return None
     if len(s) > 16:
@@ -160,7 +160,7 @@ def tsRotateRemoteToken(body):
         created_raw = P.get('rotation_capability_created')
         created = strict_pos_int(created_raw, now_ms())
         if created is None or (now_ms() - created) > CAP_TTL_MS:
-            reason = 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀）' if created is None else 'capability 已过期'
+            reason = 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀/空白）' if created is None else 'capability 已过期'
             P.delete('rotation_nonce_hash')
             P.delete('rotation_capability_owner')
             P.delete('rotation_capability_created')
@@ -721,6 +721,14 @@ def _t26_try(mode):
         P.set('rotation_capability_created', '1.7e12')           # 科学记数法
     elif mode == 'future':
         P.set('rotation_capability_created', str(now_ms() + 10 * 365 * 24 * 3600 * 1000))  # 未来时间戳
+    elif mode == 'ws_prefix':
+        # 前导空白：基线 now_ms()-1000 是【合法且未过期】的时间戳，
+        # 若误做 trim/strip 则本值会被接受 ⇒ 该用例可证明 trim 必须移除（否则测试失败）
+        P.set('rotation_capability_created', ' ' + str(now_ms() - 1000))
+    elif mode == 'ws_suffix':
+        P.set('rotation_capability_created', str(now_ms() - 1000) + ' ')           # 尾随空白
+    elif mode == 'ws_tab':
+        P.set('rotation_capability_created', '\t' + str(now_ms() - 1000) + '\n')   # 制表符/换行包裹
     # 'valid' 模式保留 set_capability 写入的有效时间戳
     r = srv_dispatch({'action': 'rotateRemoteToken', 'token': 'OLD_MOCK', 'nonce': 'badts_nonce',
                       'expected_old': 'OLD_MOCK', 'new_token': 'SHOULD_NOT', 'owner_id': 'owner_BBB'})
@@ -761,6 +769,23 @@ r26k = _t26_try('future')
 check('T26k 创建时间为未来时间戳→拒绝（expired）', r26k.get('ok') is False and r26k.get('expired') is True, str(r26k))
 check('T26k 未来时间戳：令牌未被改（仍 OLD_MOCK）', P.get('REMOTE_TOKEN') == 'OLD_MOCK')
 check('T26k 未来时间戳：capability 已清理', P.get('rotation_nonce_hash') is None)
+
+# T26m/T26n/T26o 创建时间带空白（前导/尾随/制表符换行）⇒ 拒绝且不消费（Tom 第七轮：移除 trim 后空白一律非法）
+# 基线取"若被 trim 则恰好合法且未过期"的时间戳 ⇒ 可真正证明 trim/strip 必须移除
+r26m = _t26_try('ws_prefix')
+check('T26m 创建时间带前导空白→拒绝（expired）', r26m.get('ok') is False and r26m.get('expired') is True, str(r26m))
+check('T26m 前导空白：令牌未被改（仍 OLD_MOCK）', P.get('REMOTE_TOKEN') == 'OLD_MOCK')
+check('T26m 前导空白：capability 已清理', P.get('rotation_nonce_hash') is None)
+
+r26n = _t26_try('ws_suffix')
+check('T26n 创建时间带尾随空白→拒绝（expired）', r26n.get('ok') is False and r26n.get('expired') is True, str(r26n))
+check('T26n 尾随空白：令牌未被改（仍 OLD_MOCK）', P.get('REMOTE_TOKEN') == 'OLD_MOCK')
+check('T26n 尾随空白：capability 已清理', P.get('rotation_nonce_hash') is None)
+
+r26o = _t26_try('ws_tab')
+check('T26o 创建时间被制表符/换行包裹(\\t...\\n)→拒绝（expired）', r26o.get('ok') is False and r26o.get('expired') is True, str(r26o))
+check('T26o 制表符/换行：令牌未被改（仍 OLD_MOCK）', P.get('REMOTE_TOKEN') == 'OLD_MOCK')
+check('T26o 制表符/换行：capability 已清理', P.get('rotation_nonce_hash') is None)
 
 # T26g 正向对照：时间戳有效且未过期 ⇒ 允许消费（证明严格解析不误伤正常 capability）
 r26g = _t26_try('valid')

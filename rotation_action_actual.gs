@@ -1,6 +1,6 @@
 // ============================================================
 // rotation_action_actual.gs  —— REMOTE_TOKEN 轮换【拟部署代码全文】（脱敏，供审核）
-// 版本：v8（2026-09-28）—— 回应 Tom 第六轮复审 1 条阻断（capability 创建时间严格解析）
+// 版本：v9（2026-09-28）—— 回应 Tom 第七轮复审（移除 trim：前/后空白一律拒绝，严格纯数字）
 // ------------------------------------------------------------
 // ⚠️ 本文件是"将要执行的代码"，并非已部署；须经 Rita/生产负责人单独授权后方可 PUT 进项目。
 // 全文不含任何令牌原值；NONCE / NEW / OLD 由客户端运行期生成，从不进源码、从不进日志。
@@ -64,7 +64,7 @@ function _nowMs() { return (new Date()).getTime(); }
 
 /**
  * 严格解析"正整数毫秒时间戳"（v8 对 v7 的修正）。
- * 仅接受【纯数字字符串】（无符号 / 无小数 / 无指数 / 无后缀字母），
+ * 仅接受【纯数字字符串】（无符号 / 无小数 / 无指数 / 无后缀字母 / 无任何前后空白 — v9 起不做 trim），
  * 且 > 0、不超过 Number.MAX_SAFE_INTEGER、且不为未来时间；
  * 任何不满足 ⇒ 返回 null（调用方据此失败关闭）。
  * v7 的 `parseInt(createdRaw, 10)` 会接受 "1700000000000x"（带后缀）这类非法值；
@@ -73,8 +73,8 @@ function _nowMs() { return (new Date()).getTime(); }
 function _parseStrictPositiveInt(raw, nowMs) {
   if (raw === null || raw === undefined) return null;
   if (typeof raw !== 'string') raw = String(raw);
-  raw = raw.trim();
-  if (!/^[0-9]+$/.test(raw)) return null;          // 仅数字：拒符号/小数/指数/后缀
+  // v9：【不做 trim】——任何前导/尾随空白都会让纯数字校验失败 ⇒ 返回 null（失败关闭）
+  if (!/^[0-9]+$/.test(raw)) return null;          // 仅数字：拒符号/小数/指数/后缀/空白
   if (raw.length > 16) return null;                // 超出 safe-integer 位宽（快速拒）
   var n = parseInt(raw, 10);
   if (!(n > 0)) return null;                       // 0 或 NaN
@@ -194,7 +194,7 @@ function tsRotateRemoteToken(e) {
       props.deleteProperty('rotation_capability_owner');
       props.deleteProperty('rotation_capability_created');
       var ttlMsg = (created === null)
-        ? 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）'
+        ? 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀/空白），拒绝轮换（请重新热装 capability）'
         : 'capability 已过期，拒绝轮换（请重新热装 capability）';
       return JSON.stringify({ ok: false, error: ttlMsg, expired: true });
     }

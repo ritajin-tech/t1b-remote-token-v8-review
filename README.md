@@ -1,29 +1,44 @@
-# T1-B REMOTE_TOKEN 轮换 v8 交付包（Tom 复审用）
+# T1-B REMOTE_TOKEN 轮换 — v9 复审材料（2026-09-28）
 
-本仓库是 `Tom_v8_发送包_20260928.zip` 的完整内容（21 个文件，已逐文件展开，便于直接浏览 / 克隆）。
-
-- 全部文件已脱敏：**无真实令牌、无真实 URL**（脱敏扫描 NONE）。
-- 这是 **v8** 方案，回应 Tom 2026-09-28 **第六轮**复审（1 条新阻断：capability 创建时间须为「严格正整数时间戳」，拒绝数字后缀 / 小数 / 科学记数法 / 未来时间）。
-- v8 仍为**待审核方案**；审核通过 ≠ 生产授权；本轮**未部署、未执行轮换**。凭证事件仍 OPEN；T1-B B 列修复生产批准数仍为 0。
+本仓库为给外部审核人（Tom Zhu）的代码复审交付，**公开**、无需账号即可查看。
+所有文件已脱敏：**无真实令牌、无真实 URL**（脱敏扫描 NONE）。
 
 ## 先看这两个
-- `DELIVERY_MANIFEST_20260928.md` —— 文件清单 + 每条阻断的修订与验证物 + Tom 复跑指引
-- `next_rotation_plan_v8_20260928.md` —— v8 方案说明（含本轮 1 条阻断）
 
-## 核心代码与测试
-- `rotation_action_actual.gs` —— 拟部署服务端代码（v8，严格正整数时间戳解析 `_parseStrictPositiveInt`）
-- `rotate_remote_token_client.py` —— 客户端（v6，本轮服务端改动不要求客户端变更）
-- `rotation_logic_test.py` —— Python 逻辑测试（**119/119 PASS，exit 0**）
-- `dispatch_sim_test.js` —— Node 分发仿真（**85/85 PASS，exit 0**，用生产真实 RemoteTrigger.gs + 真实 doPost 原文）
-- `TEST_OUTPUT_20260928.txt` —— 本机真实执行的完整输出（未删改）
+1. `DELIVERY_MANIFEST_20260928.md` —— 交付清单 + Tom 第七轮 3 项修正的逐条对应 + 文件哈希表
+2. `next_rotation_plan_v9_20260928.md` —— 方案 v9 正文（本轮主体）
 
-## 操作步骤
-- `rotation_runbook_20260928.md` —— 部署 / 轮换 runbook（**§9.6** 为 v8 新增）
+## 本轮（v9）改了什么
+
+回应 Tom **第七轮**复审的 3 项：
+
+| # | Tom 意见 | 处置 |
+|---|---|---|
+| 1 | 校验前先 `trim()`，带前后空白的值仍能通过纯数字检查 | **移除 `trim()` / `strip()`**，空白（空格/制表符/换行）一律拒绝；新增 `F7m/F7n/F7o`、`T26m/T26n/T26o` 负向测试 |
+| 2 | 清单声明的 `TEST_OUTPUT_20260928.txt` 大小/SHA 与包内实际文件不一致（26,023 / `5b8700…` vs 25,798 / `1d4534…`） | 根因 = git CRLF→LF 换行转换（差值 225 B 恰等于行数，实测影响 7 个文件）。**清单哈希改为按实际分发字节计算并二次自校验** |
+| 3 | 平台差异口径仍写「95/96」，应为 macOS 118 / Windows 119 | 已更正；因 v9 新增 9 项检查，本轮实际为 **Windows 128 / macOS 127**、Node **94/94** |
+
+## 关键文件
+
+- `rotation_action_actual.gs` —— 拟部署服务端代码全文 v9
+- `rotate_remote_token_client.py` —— 客户端
+- `rotation_logic_test.py` —— Python 逻辑测试（Windows **128/128**、macOS 127/127）
+- `dispatch_sim_test.js` —— Node 分发仿真（**94/94**，嵌入生产真实 RemoteTrigger.gs + 真实 doPost）
+- `_gen_dispatch_sim.py` —— 上项生成器（证明嵌入源码来自真实文件、零手抄）
+- `TEST_OUTPUT_20260928.txt` —— 两套测试本机真实执行的完整输出
+- `ALL_IN_ONE_20260928.txt` —— 单文件合集（备用）
+- `rotation_runbook_20260928.md` —— 操作步骤（**§9.7** 为 v9 新增）
 
 ## 复跑
+
 ```bash
-python rotation_logic_test.py   # 期望 119/119，exit 0（缺 deployment_evidence_20260926.json → exit 2）
-node dispatch_sim_test.js       # 期望 85/85，exit 0（需 Node 18+）
+python rotation_logic_test.py   # 期望 PASS 128/128（Windows）或 127/127（macOS），退出码 0
+node dispatch_sim_test.js       # 期望 PASS 94/94，退出码 0（需 Node 18+）
 ```
 
-> 注：原始 zip 包本体未包含在本仓库；本仓库即其 21 个组成文件的逐文件展开，内容等价。
+## 状态（重要）
+
+- v9 **仍为待审核方案**；审核通过 ≠ 生产授权。
+- **修复并复审前不要部署、不要执行轮换。**
+- 凭证事件维持 **OPEN**；T1-B B 列修复生产批准数维持 **0**。
+- 94/94 分发测试因审核人本机无 Node，**尚未由其独立复现**（已如实标注）。

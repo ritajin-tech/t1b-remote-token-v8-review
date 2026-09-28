@@ -38,8 +38,8 @@ _p0 = gs.index('var ROTATION_CAP_TTL_MS')
 _p1 = gs.index('/**', _p0)
 preamble = gs[_p0:_p1].rstrip() + '\n\n'
 handlers = preamble + '\n\n'.join(extract_fn(gs, n) + '\n' for n in
-                                  ['tsSetRotationCapability', 'tsRotateRemoteToken',
-                                   'tsRotationStatus', '_sha256'])
+                                  ['_parseStrictPositiveInt', 'tsSetRotationCapability',
+                                   'tsRotateRemoteToken', 'tsRotationStatus', '_sha256'])
 
 pat = open(os.path.join(BASE, '_tmp_patched_RemoteActions.js'), encoding='utf-8').read()
 blk = pat[pat.index('var REMOTE_ACTIONS'):pat.index('};', pat.index('var REMOTE_ACTIONS')) + 2]
@@ -209,7 +209,7 @@ const OWNER = 'owner_unit_test';
 {
   const props = makeProps({ REMOTE_TOKEN: OLD, rotation_counter: '0', rotation_nonce_hash: NONCE_HASH,
                            rotation_capability_owner: OWNER,
-                           rotation_capability_created: String(Date.now()) });
+                           rotation_capability_created: '1000000' });  // 对齐 mock 时钟 __clock=1000000：有效且未过期
   const sb = makeEnv(props);
   // B1 错误令牌 → 拒绝，且处理函数未被调用（capability 未被消费）
   const r = post(sb, { action: 'rotateRemoteToken', token: 'WRONG_TOKEN', nonce: NONCE_HEX, expected_old: OLD, new_token: NEW });
@@ -504,6 +504,107 @@ function fresh(counter) {
     expected_old: OLD, new_token: 'GOOD_NEW', owner_id: OWNER }).message);
   check('F7g 创建时间有效且未过期→允许轮换', f7g.ok === true && f7g.rotated === true, JSON.stringify(f7g));
   check('F7g 正向对照：令牌已切为新值', props7g.getProperty('REMOTE_TOKEN') === 'GOOD_NEW');
+
+  // F7h/F7i/F7j/F7k 消费时创建时间严格解析（v8 修正，Tom 第六轮）：
+  // 数字后缀 / 小数 / 科学记数法 / 未来时间戳 均非"严格正整数时间戳"，必须拒绝并清理 capability。
+
+  // F7h created 带数字后缀 "1700000000000x"（v7 的 parseInt 会吞掉 x）
+  let props7h = fresh(0);
+  let sb7h = makeEnv(props7h);
+  post(sb7h, { action: 'setRotationCapability', token: OLD, nonce_hash: NONCE_HASH,
+               expected_old: OLD, owner_id: OWNER });
+  props7h.setProperty('rotation_capability_created', '1700000000000x');
+  let f7h = JSON.parse(post(sb7h, { action: 'rotateRemoteToken', token: OLD, nonce: NONCE_HEX,
+    expected_old: OLD, new_token: 'SHOULD_NOT', owner_id: OWNER }).message);
+  check('F7h 创建时间带数字后缀→拒绝（expired）', f7h.ok === false && f7h.expired === true, JSON.stringify(f7h));
+  check('F7h 创建时间带数字后缀：令牌未被改（仍 OLD）', props7h.getProperty('REMOTE_TOKEN') === OLD);
+  check('F7h 创建时间带数字后缀：capability 已清理', props7h.getProperty('rotation_nonce_hash') === null);
+
+  // F7i created 为小数 "123.456"
+  let props7i = fresh(0);
+  let sb7i = makeEnv(props7i);
+  post(sb7i, { action: 'setRotationCapability', token: OLD, nonce_hash: NONCE_HASH,
+               expected_old: OLD, owner_id: OWNER });
+  props7i.setProperty('rotation_capability_created', '123.456');
+  let f7i = JSON.parse(post(sb7i, { action: 'rotateRemoteToken', token: OLD, nonce: NONCE_HEX,
+    expected_old: OLD, new_token: 'SHOULD_NOT', owner_id: OWNER }).message);
+  check('F7i 创建时间为小数→拒绝（expired）', f7i.ok === false && f7i.expired === true, JSON.stringify(f7i));
+  check('F7i 创建时间为小数：令牌未被改（仍 OLD）', props7i.getProperty('REMOTE_TOKEN') === OLD);
+  check('F7i 创建时间为小数：capability 已清理', props7i.getProperty('rotation_nonce_hash') === null);
+
+  // F7j created 为科学记数法 "1.7e12"
+  let props7j = fresh(0);
+  let sb7j = makeEnv(props7j);
+  post(sb7j, { action: 'setRotationCapability', token: OLD, nonce_hash: NONCE_HASH,
+               expected_old: OLD, owner_id: OWNER });
+  props7j.setProperty('rotation_capability_created', '1.7e12');
+  let f7j = JSON.parse(post(sb7j, { action: 'rotateRemoteToken', token: OLD, nonce: NONCE_HEX,
+    expected_old: OLD, new_token: 'SHOULD_NOT', owner_id: OWNER }).message);
+  check('F7j 创建时间为科学记数法→拒绝（expired）', f7j.ok === false && f7j.expired === true, JSON.stringify(f7j));
+  check('F7j 创建时间为科学记数法：令牌未被改（仍 OLD）', props7j.getProperty('REMOTE_TOKEN') === OLD);
+  check('F7j 创建时间为科学记数法：capability 已清理', props7j.getProperty('rotation_nonce_hash') === null);
+
+  // F7k created 为未来时间戳（不可能由本系统生成，必须失败关闭）
+  let props7k = fresh(0);
+  let sb7k = makeEnv(props7k);
+  post(sb7k, { action: 'setRotationCapability', token: OLD, nonce_hash: NONCE_HASH,
+               expected_old: OLD, owner_id: OWNER });
+  props7k.setProperty('rotation_capability_created', '9999999999999');
+  let f7k = JSON.parse(post(sb7k, { action: 'rotateRemoteToken', token: OLD, nonce: NONCE_HEX,
+    expected_old: OLD, new_token: 'SHOULD_NOT', owner_id: OWNER }).message);
+  check('F7k 创建时间为未来时间戳→拒绝（expired）', f7k.ok === false && f7k.expired === true, JSON.stringify(f7k));
+  check('F7k 创建时间为未来时间戳：令牌未被改（仍 OLD）', props7k.getProperty('REMOTE_TOKEN') === OLD);
+  check('F7k 创建时间为未来时间戳：capability 已清理', props7k.getProperty('rotation_nonce_hash') === null);
+
+  // F7l 正向对照：创建时间为严格正整数时间戳（手动设为有效近值）⇒ 允许消费（证明严格解析不误伤正常 capability）
+  let props7l = fresh(0);
+  let sb7l = makeEnv(props7l);
+  sb7l.__clock = 3000000;
+  post(sb7l, { action: 'setRotationCapability', token: OLD, nonce_hash: NONCE_HASH,
+               expected_old: OLD, owner_id: OWNER });
+  props7l.setProperty('rotation_capability_created', '3000000');   // 明确写入一个干净正整数时间戳
+  let f7l = JSON.parse(post(sb7l, { action: 'rotateRemoteToken', token: OLD, nonce: NONCE_HEX,
+    expected_old: OLD, new_token: 'GOOD_NEW', owner_id: OWNER }).message);
+  check('F7l 创建时间为干净正整数时间戳→允许轮换', f7l.ok === true && f7l.rotated === true, JSON.stringify(f7l));
+  check('F7l 正向对照：令牌已切为新值', props7l.getProperty('REMOTE_TOKEN') === 'GOOD_NEW');
+
+  // F7m/F7n/F7o 创建时间带空白（前导/尾随/制表符换行）⇒ 拒绝（Tom 第七轮：移除 trim 后空白一律非法）
+  // 基线取"若被 trim 则恰好合法且未过期"的时间戳 ⇒ 可真正证明 trim 必须移除
+  let props7m = fresh(0);
+  let sb7m = makeEnv(props7m);
+  sb7m.__clock = 4000000;
+  post(sb7m, { action: 'setRotationCapability', token: OLD, nonce_hash: NONCE_HASH,
+               expected_old: OLD, owner_id: OWNER });
+  props7m.setProperty('rotation_capability_created', ' 4000000');        // 前导空白
+  let f7m = JSON.parse(post(sb7m, { action: 'rotateRemoteToken', token: OLD, nonce: NONCE_HEX,
+    expected_old: OLD, new_token: 'SHOULD_NOT', owner_id: OWNER }).message);
+  check('F7m 创建时间带前导空白→拒绝（expired）', f7m.ok === false && f7m.expired === true, JSON.stringify(f7m));
+  check('F7m 前导空白：令牌未被改（仍 OLD）', props7m.getProperty('REMOTE_TOKEN') === OLD);
+  check('F7m 前导空白：capability 已清理', props7m.getProperty('rotation_nonce_hash') === null);
+
+  let props7n = fresh(0);
+  let sb7n = makeEnv(props7n);
+  sb7n.__clock = 5000000;
+  post(sb7n, { action: 'setRotationCapability', token: OLD, nonce_hash: NONCE_HASH,
+               expected_old: OLD, owner_id: OWNER });
+  props7n.setProperty('rotation_capability_created', '5000000 ');        // 尾随空白
+  let f7n = JSON.parse(post(sb7n, { action: 'rotateRemoteToken', token: OLD, nonce: NONCE_HEX,
+    expected_old: OLD, new_token: 'SHOULD_NOT', owner_id: OWNER }).message);
+  check('F7n 创建时间带尾随空白→拒绝（expired）', f7n.ok === false && f7n.expired === true, JSON.stringify(f7n));
+  check('F7n 尾随空白：令牌未被改（仍 OLD）', props7n.getProperty('REMOTE_TOKEN') === OLD);
+  check('F7n 尾随空白：capability 已清理', props7n.getProperty('rotation_nonce_hash') === null);
+
+  let props7o = fresh(0);
+  let sb7o = makeEnv(props7o);
+  sb7o.__clock = 6000000;
+  post(sb7o, { action: 'setRotationCapability', token: OLD, nonce_hash: NONCE_HASH,
+               expected_old: OLD, owner_id: OWNER });
+  props7o.setProperty('rotation_capability_created', '\t6000000\n');     // 制表符/换行包裹
+  let f7o = JSON.parse(post(sb7o, { action: 'rotateRemoteToken', token: OLD, nonce: NONCE_HEX,
+    expected_old: OLD, new_token: 'SHOULD_NOT', owner_id: OWNER }).message);
+  check('F7o 创建时间被制表符/换行包裹→拒绝（expired）', f7o.ok === false && f7o.expired === true, JSON.stringify(f7o));
+  check('F7o 制表符/换行：令牌未被改（仍 OLD）', props7o.getProperty('REMOTE_TOKEN') === OLD);
+  check('F7o 制表符/换行：capability 已清理', props7o.getProperty('rotation_nonce_hash') === null);
 }
 
 // ---------- 汇总 ----------
