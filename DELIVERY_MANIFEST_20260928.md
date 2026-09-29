@@ -68,7 +68,7 @@
 | `next_rotation_plan_v7_20260928.md` | 方案 v7（已被 v8/v9 取代，保留供比对；创建时间缺失/无效 ⇒ 失败关闭） | 4238 B | `db41874d68ee44dfc7b55c03ae9e63d560147dec5517c090468d66c705b85be5` |
 | `rotation_deploy_diff_20260928.patch` | 拟部署代码差异（unified diff，含源文件 SHA-256，已 git apply 实测） | 3586 B | `25ccab0d995f14b0ba2e6016a8b9024eebb8669aae2ddccaf8b0808ca70d1045` |
 | `rotation_action_actual.gs` | 拟部署服务端代码全文 v9（v8 严格正整数解析 + v9 移除 trim：空白前后缀一律拒绝；v6 三项 + v7 双条件 均保留并回归通过） | 18273 B | `fa05d7537ce1f56fb43d29b4ea286495285f2c291a292e177c4f18f40dd1b488` |
-| `dispatch_sim_test.js` | 用【真实】RemoteTrigger.gs + 真实 doPost 仿真的 Node 测试（94/94，含 F6/F6b/F7/F7b–F7l 及 v9 新增 F7m/F7n/F7o 空白负向） | 53237 B | `5b464c2fa98ae2db28c8472161063883453c288d1eca7d2db66e69949747d645` |
+| `dispatch_sim_test.js` | 用【真实】RemoteTrigger.gs + 真实 doPost 仿真的 Node 测试（94/94，含 F6/F6b/F7/F7b–F7l 及 v9 新增 F7m/F7n/F7o 空白负向） | 53244 B | `10640342ed1ed826d2df1dc7709258ee214d7c0e0fc75b58640532aa4faad797` |
 | `_gen_dispatch_sim.py` | 上项的生成器：证明嵌入源码来自真实文件、零手抄 | 39036 B | `dc3d1f1537ff1c50c70c79890d54f46efca83776d51424750aa3fd826cf29bcb` |
 | `dispatch_sim_py.py` | 纯 Python 语义复刻的分发层仿真（94/94，用例名/编号与 dispatch_sim_test.js 对齐；无 Node 依赖，Tom 可在 macOS 直接 `python3 dispatch_sim_py.py` 复跑；属【补充测试】，非 JavaScript 运行时执行真实分发器）。self_check() 25 条静态断言（测试开始时调用一次，对嵌入源码做关键片段断言防漂移） | 58838 B | `e6773b725269309ec2c562f69ecace4ec42bc4b3d988d130ca445aa34e19d96a` |
 | `_gen_dispatch_sim_py.py` | 上项的生成器：证明嵌入的 dss_RemoteTrigger.js / doPost / 3 个处理函数均来自真实文件、零手抄；self_check() 25 条源码静态断言（测试开始时执行一次，片段断言，漂移即 exit 2） | 45238 B | `e66139a2f0744068e0b02481d178c16896921c6965d358408576fab7177a0706` |
@@ -86,7 +86,7 @@
 | `STATE.json.sha256` | 侧车（哈希内容） | 77 B | `373fc436b83d1889ac7b18a29b0b4b88147aeaf2c06332f566d06643628a2a1b` |
 | `STATE.json.sha1` | 侧车（哈希内容） | 53 B | `935584cecee14d07b9c10c2add14a84e45dfbe5662c66d56a5deae48f17eb34a` |
 | `_build_manifest.py` | 清单构建/核验脚本（v9.1 起随包分发，回应 Tom 第八轮：说明引用的脚本必须在包内；`verify` 为离线自包含，直接解析本清单与同目录文件比对，无需网络/包外文件） | 29239 B | `288fe16a76f38ae0ec20acb1b90e290ae116c59c2d25234d4f92d7595b6cd1ef` |
-| `ALL_IN_ONE_20260928.txt` | 单文件合集（备用，内容=上表文件按序拼接） | 582606 B | `e2addbdd758f180dd0e194759df12ed37646d0870687f5dd397c498795255b0c` |
+| `ALL_IN_ONE_20260928.txt` | 单文件合集（备用，内容=上表文件按序拼接） | 582613 B | `54b0e045647780955ceeafa48062b3aa8cb9a5056fef3c0e33509d9bdee25661` |
 
 ---
 
@@ -152,6 +152,15 @@ Tom 本机复核：`python3 _build_manifest.py verify` → 24/24 PASS；`python3
 
 **两点文案/材料修正（已落实于本清单 v9.2.1）：**
 1. `self_check()` 实为 **25 条**静态断言（此前称 23 条有误）；在**测试开始时调用一次**（非每个用例分别执行）；检查方式是对**嵌入源码文本做关键片段断言**，**非完整字节哈希验证**。
-2. Python 仿真与 Node fixture 的**过期时间错误提示存在一字之差**：Python 仿真提示含"空白"（与 v9 服务端 `rotation_action_actual.gs` 第 197 行一致）；而 Node 测试 `dispatch_sim_test.js` 内嵌的处理函数快照（第 310 行）缺"空白"——该 Node fixture 早于 v9 这一措辞，属**已知滞后**。两版对全部 94 用例的**结构化结果完全一致**（断言仅校验 `ok`/`expired`/`令牌未改`/`capability 已清理`，从不依赖错误字符串原文），故判定不受影响。
+2. Python 仿真与 Node fixture 的**过期时间错误提示曾存在一字之差**：Python 仿真提示含"空白"（与 v9 服务端 `rotation_action_actual.gs` 第 197 行一致）；而旧版 Node fixture 内嵌处理函数快照（第 310 行）缺"空白"——属**已知滞后**。该差异已于 **v9.2.2 消除**：Node fixture 已从当前 v9 服务端源码重新生成，`dispatch_sim_test.js` 内嵌处理函数现与 v9 服务端、`dispatch_sim_py.py` 逐字一致（第 310 行已含"空白"）。两版对全部 94 用例的**结构化结果始终完全一致**（断言仅校验 `ok`/`expired`/`令牌未改`/`capability 已清理`，从不依赖错误字符串原文）。
 
-**建议（非本轮必需，供后续）**：将 Node fixture 从当前 v9 服务端源码重新生成，使其过期提示也含"空白"，即可消除该文本差异、令两套测试材料逐字一致。
+**已落实（v9.2.2）**：Node fixture 已从当前 v9 服务端源码重新生成，过期提示现已含"空白"，两套测试材料逐字一致；v9.2.2 仅替换 `dispatch_sim_test.js` 并重算清单哈希，无任何代码/逻辑变更。
+
+## 十、v9.2.2 收尾（自主，2026-09-29）
+
+- 触发：v9.2.1 复审已闭环（无新阻断、全链闭环），其中登记的「空白」文本差属 Node fixture 早于 v9 措辞的滞后；按用户授权做可选收尾。
+- 动作：运行 `_gen_dispatch_sim.py`（实时读取当前 `rotation_action_actual.gs`）重新生成 `dispatch_sim_test.js`，使其内嵌处理函数与 v9 服务端、`dispatch_sim_py.py` 逐字一致（第 310 行过期提示已含"空白"）。
+- 验证：在本机用 Node 18+ 实跑重生成后的 `dispatch_sim_test.js` → **PASS 94 / 94，退出码 0**（与旧版结构化结果完全一致，仅文本对齐）。
+- 本包（v9.2.2）仅替换 `dispatch_sim_test.js` 并重算清单哈希；**无任何代码逻辑变更、无新授权需求**。
+- 治理红线维持不变：Tom 复审 ≠ 生产授权；T1-B B 列生产写入批准数仍为 **0**；凭证事件仍为 **OPEN**；本包不部署、不执行真实轮换。
+- 后续唯一外部依赖：仍须由 Rita / 生产负责人**单独授权**真实 REMOTE_TOKEN 轮换（与本次评审无关的独立治理闸门）。
