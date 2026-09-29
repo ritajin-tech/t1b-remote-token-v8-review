@@ -531,14 +531,14 @@ function _sha256(hexInput) {
 
 
 ================================================================================
-FILE: dispatch_sim_test.js  (53237 bytes)  sha256=5b464c2fa98ae2db28c8472161063883453c288d1eca7d2db66e69949747d645
+FILE: dispatch_sim_test.js  (53244 bytes)  sha256=10640342ed1ed826d2df1dc7709258ee214d7c0e0fc75b58640532aa4faad797
 ================================================================================
 // ============================================================
 // dispatch_sim_test.js —— 用【真实 GAS 分发源码】仿真验证 REMOTE_TOKEN 轮换接入
 // 生成方式：由 _gen_dispatch_sim.py 从真实文件自动嵌入（零手抄）
 //   · 嵌入的真实分发器 RemoteTrigger.gs  SHA-256(LF) = 9064d772cb89bf98796dba03b331914e4dcbd4e3109daefca1932c1921ae960e
 //   · 嵌入的真实 doPost（Code.gs 第 135-140 行）
-//   · 嵌入的拟部署处理函数（rotation_action_actual.gs 第 2 节）SHA-256(LF) = 9827aca1a09de5e392a5bade84bdfe8ed5ccd2dd35a990ac7b72413a9fd6c943
+//   · 嵌入的拟部署处理函数（rotation_action_actual.gs 第 2 节）SHA-256(LF) = fa05d7537ce1f56fb43d29b4ea286495285f2c291a292e177c4f18f40dd1b488
 //   · REMOTE_ACTIONS 键名取自打补丁后的真实注册表（22 个，新增 3 个）
 // 运行：node dispatch_sim_test.js    退出码：0=全通过 1=有失败 2=自检失败（嵌入源缺失/被改）
 // 红线：全程 mock，无网络、无真实令牌、不触生产。
@@ -842,7 +842,7 @@ function tsRotateRemoteToken(e) {
       props.deleteProperty('rotation_capability_owner');
       props.deleteProperty('rotation_capability_created');
       var ttlMsg = (created === null)
-        ? 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀），拒绝轮换（请重新热装 capability）'
+        ? 'capability 创建时间缺失或无效（须为严格正整数时间戳，不含符号/小数/指数/后缀/空白），拒绝轮换（请重新热装 capability）'
         : 'capability 已过期，拒绝轮换（请重新热装 capability）';
       return JSON.stringify({ ok: false, error: ttlMsg, expired: true });
     }
