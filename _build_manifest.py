@@ -40,6 +40,8 @@ ORDER = [
     ("rotation_action_actual.gs", "拟部署服务端代码全文 v9（v8 严格正整数解析 + v9 移除 trim：空白前后缀一律拒绝；v6 三项 + v7 双条件 均保留并回归通过）"),
     ("dispatch_sim_test.js", "用【真实】RemoteTrigger.gs + 真实 doPost 仿真的 Node 测试（94/94，含 F6/F6b/F7/F7b–F7l 及 v9 新增 F7m/F7n/F7o 空白负向）"),
     ("_gen_dispatch_sim.py", "上项的生成器：证明嵌入源码来自真实文件、零手抄"),
+    ("dispatch_sim_py.py", "纯 Python 复刻的分发层仿真（94/94，用例名/编号与 dispatch_sim_test.js 一一对应；无 Node 依赖，Tom 可在 macOS 直接 `python3 dispatch_sim_py.py` 独立复跑；含 self_check() 对真实源码做静态断言防漂移）"),
+    ("_gen_dispatch_sim_py.py", "上项的生成器：证明嵌入的 dss_RemoteTrigger.js / doPost / 3 个处理函数均来自真实文件、零手抄；self_check() 23 条源码静态断言，漂移即 exit 2"),
     ("rotate_remote_token_client.py", "客户端 v6（v9 服务端改动不要求客户端变更；字段对齐 token + capability 归属/TTL + 在途判定 + 权限收紧 + ACL 读回失败关闭 + 写前暂存）"),
     ("rotation_logic_test.py", "Python 逻辑测试 v9（Windows 128/128、macOS 127/127；含 T26d–T26k 及 v9 新增 T26m/T26n/T26o 空白负向；缺输入 exit 2）"),
     ("deployment_evidence_20260926.json", "rotation_logic_test.py 的必需输入（真实只读枚举产物）"),
@@ -71,10 +73,16 @@ def _get(url, headers=None, timeout=30):
 def fetch_shipped(name, tries=6, delay=2.0):
     """抓取【仓库实际分发的字节】（审核人下载到的就是这个）。
 
-    必须用 Contents API 取权威 blob：实测 raw.githubusercontent.com 有 CDN 缓存，
+    若设置了 T1B_LOCAL_DIR 环境变量，则直接读本地该目录的对应文件（用于离线重建清单：
+    本地 checkout 的字节即仓库存储字节，与审核人下载到的一致），不再走网络。
+    否则用 Contents API 取权威 blob：实测 raw.githubusercontent.com 有 CDN 缓存，
     推送后仍可能返回【旧版本】字节（本轮即踩到：API=22835 B 而 raw 仍给 21259 B），
     会让清单声明值与实际分发不一致 —— 正是上一轮要修的那个问题。raw 仅作兜底。
     """
+    if os.environ.get("T1B_LOCAL_DIR"):
+        p = os.path.join(os.environ["T1B_LOCAL_DIR"], name)
+        with open(p, "rb") as f:
+            return f.read()
     last = None
     for _ in range(tries):
         try:
@@ -134,6 +142,7 @@ def build():
     manifest = f"""# Tom 交付包 v9.1 — 交付清单（2026-09-28，v9 代码已过审 + 回应 Tom 第八轮交付修正）
 
 > **代码版本仍为 v9，未改动**：Tom 第八轮已复审通过（针对 v9 修订范围）。本版仅修正**交付/文档**问题。
+> **本轮追加（v9.1 addendum）**：新增纯 Python 分发仿真 `dispatch_sim_py.py`（94/94，与 `dispatch_sim_test.js` 一一对应），**无需 Node**，Tom 可在 macOS 直接复跑 —— 消除"本机无 Node 未复现"缺口。其生成器 `_gen_dispatch_sim_py.py` 一并随包分发，含 `self_check()` 源码静态断言防漂移。
 > v9.1 修正（Tom 第八轮）：交付说明引用了 `python _build_manifest.py verify`，但该脚本**未随包分发**，
 > 且其原实现还依赖一份**不随包分发**的本地台账 `_manifest_hashes.json`，故无法按指引复跑。
 > 现：`_build_manifest.py` **已随包分发并在下表声明哈希**；`verify` 改为**离线自包含**
@@ -142,7 +151,7 @@ def build():
 > 目的：回应 Tom 2026-09-28 **第七轮**复审（v8 未通过，3 项待修正：① `trim()` 使带空白的值仍能通过纯数字检查；② 清单声明的 `TEST_OUTPUT_20260928.txt` 大小/SHA 与包内实际文件不一致；③ 平台差异口径仍写「95/96」）。
 > 三项均已修正：**移除 `trim()`**（空白前缀/尾随/制表符换行一律拒绝）、**清单哈希改为按实际分发字节计算并二次自校验**、**平台口径更新为 Windows 128 / macOS 127**。
 > 前几轮阻断（v6 三项 / v7 双条件失败关闭 / v8 严格正整数解析）均**保留并回归通过**。
-> Node 测试已扩到 **94/94**，仍为 Tom 未复现项（其本机无 Node），已如实标注。
+> Node 测试已扩到 **94/94**。本轮**新增纯 Python 分发仿真 `dispatch_sim_py.py`（94/94，与 `dispatch_sim_test.js` 用例名/编号一一对应）**，**无需 Node** —— Tom 可在 macOS 直接 `python3 dispatch_sim_py.py` 独立复跑这 94 个分发用例，彻底消除"本机无 Node 未复现"的缺口。
 > 校验：`sha256sum <文件>`（Windows 用 `certutil -hashfile <文件> SHA256`），与下表逐一比对。
 
 ## 🔴 哈希口径（针对第七轮第 2 项，务必先读）
@@ -225,6 +234,9 @@ def build():
 # 1) 用真实分发源码的分发仿真（需要 node 18+）
 node dispatch_sim_test.js          # 期望：PASS 94 / 94，退出码 0
 
+# 1b) 纯 Python 分发仿真（无需 node，macOS 直接可跑）
+python3 dispatch_sim_py.py        # 期望：PASS 94 / 94，退出码 0（self_check 静态断言防漂移）
+
 # 2) 逻辑层仿真（需要 python 3）
 python rotation_logic_test.py      # 期望：PASS 128 / 128（Windows）或 127 / 127（macOS），退出码 0
                                    # 缺 deployment_evidence_20260926.json → 退出码 2 且不输出裁决
@@ -247,7 +259,7 @@ cd chk && git init -q . && git apply --check -p1 ../rotation_deploy_diff_2026092
 - 凭证事件维持 **OPEN**：T2 曾现于 URL 查询串、Google 服务端日志可见性未证伪；须待方案 §5/§6/§7 核验通过方可降级。
 - T1-B B 列修复批准数维持 **0**；本包不涉及 T1-B 修复。
 - **v9 仍为待审核方案**。Tom 审核通过 ≠ 生产授权；真实轮换须经 Rita / 生产负责人单独授权。
-- 128/128（Windows）与 94/94 均为 Rita 侧自测结果；**94/94 因 Tom 本机无 Node，尚未由其独立复现**。
+- 128/128（Windows）与 94/94 均为 Rita 侧自测结果；**94/94 现已可由 Tom 在 macOS 用纯 Python 仿真 `dispatch_sim_py.py` 独立复现（无需 Node）**。
 """
 
     with open(os.path.join(D, "DELIVERY_MANIFEST_20260928.md"), "w", encoding="utf-8") as f:
