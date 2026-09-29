@@ -1,7 +1,7 @@
 # Tom 交付包 v9.1 — 交付清单（2026-09-28，v9 代码已过审 + 回应 Tom 第八轮交付修正）
 
 > **代码版本仍为 v9，未改动**：Tom 第八轮已复审通过（针对 v9 修订范围）。本版仅修正**交付/文档**问题。
-> **本轮追加（v9.1 addendum）**：新增纯 Python 分发仿真 `dispatch_sim_py.py`（94/94，与 `dispatch_sim_test.js` 一一对应），**无需 Node**，Tom 可在 macOS 直接复跑 —— 消除"本机无 Node 未复现"缺口。其生成器 `_gen_dispatch_sim_py.py` 一并随包分发，含 `self_check()` 源码静态断言防漂移。
+> **本轮追加（v9.1 addendum）**：新增纯 Python 分发仿真 `dispatch_sim_py.py`（94/94），**无需 Node**，Tom 可在 macOS 直接复跑 —— 补上"无 Node 环境下的分发用例运行入口"。其定位为**补充测试 / 语义复刻**：按真实源码逻辑逐行镜像分发器与 3 个处理函数，用例名/编号与 `dispatch_sim_test.js` 对齐，但**不在 JavaScript 运行时执行真实分发器**，故不等同于 Node 测试的完全等价替代（Tom v9.2 复审明确）。生成器 `_gen_dispatch_sim_py.py` 一并随包分发，含 `self_check()`（**25 条**静态断言，测试开始时执行一次，对嵌入源码做关键片段断言防漂移，非完整字节哈希）。
 > v9.1 修正（Tom 第八轮）：交付说明引用了 `python _build_manifest.py verify`，但该脚本**未随包分发**，
 > 且其原实现还依赖一份**不随包分发**的本地台账 `_manifest_hashes.json`，故无法按指引复跑。
 > 现：`_build_manifest.py` **已随包分发并在下表声明哈希**；`verify` 改为**离线自包含**
@@ -10,7 +10,7 @@
 > 目的：回应 Tom 2026-09-28 **第七轮**复审（v8 未通过，3 项待修正：① `trim()` 使带空白的值仍能通过纯数字检查；② 清单声明的 `TEST_OUTPUT_20260928.txt` 大小/SHA 与包内实际文件不一致；③ 平台差异口径仍写「95/96」）。
 > 三项均已修正：**移除 `trim()`**（空白前缀/尾随/制表符换行一律拒绝）、**清单哈希改为按实际分发字节计算并二次自校验**、**平台口径更新为 Windows 128 / macOS 127**。
 > 前几轮阻断（v6 三项 / v7 双条件失败关闭 / v8 严格正整数解析）均**保留并回归通过**。
-> Node 测试已扩到 **94/94**。本轮**新增纯 Python 分发仿真 `dispatch_sim_py.py`（94/94，与 `dispatch_sim_test.js` 用例名/编号一一对应）**，**无需 Node** —— Tom 可在 macOS 直接 `python3 dispatch_sim_py.py` 独立复跑这 94 个分发用例，彻底消除"本机无 Node 未复现"的缺口。
+> Node 测试已扩到 **94/94**。本轮**新增纯 Python 分发仿真 `dispatch_sim_py.py`（94/94）**，**无需 Node** —— Tom 可在 macOS 直接 `python3 dispatch_sim_py.py` 复跑这 94 个分发用例。其定位为**补充测试 / 语义复刻**（用例名/编号与 `dispatch_sim_test.js` 对齐，但属 Python 对真实逻辑的镜像，**非 JavaScript 运行时执行真实分发器**），故作为"无 Node 环境下的运行入口"补充证据，不视为 Node 测试的完全等价替代。
 > 校验：`sha256sum <文件>`（Windows 用 `certutil -hashfile <文件> SHA256`），与下表逐一比对。
 
 ## 🔴 哈希口径（针对第七轮第 2 项，务必先读）
@@ -70,8 +70,8 @@
 | `rotation_action_actual.gs` | 拟部署服务端代码全文 v9（v8 严格正整数解析 + v9 移除 trim：空白前后缀一律拒绝；v6 三项 + v7 双条件 均保留并回归通过） | 18273 B | `fa05d7537ce1f56fb43d29b4ea286495285f2c291a292e177c4f18f40dd1b488` |
 | `dispatch_sim_test.js` | 用【真实】RemoteTrigger.gs + 真实 doPost 仿真的 Node 测试（94/94，含 F6/F6b/F7/F7b–F7l 及 v9 新增 F7m/F7n/F7o 空白负向） | 53237 B | `5b464c2fa98ae2db28c8472161063883453c288d1eca7d2db66e69949747d645` |
 | `_gen_dispatch_sim.py` | 上项的生成器：证明嵌入源码来自真实文件、零手抄 | 39036 B | `dc3d1f1537ff1c50c70c79890d54f46efca83776d51424750aa3fd826cf29bcb` |
-| `dispatch_sim_py.py` | 纯 Python 复刻的分发层仿真（94/94，用例名/编号与 dispatch_sim_test.js 一一对应；无 Node 依赖，Tom 可在 macOS 直接 `python3 dispatch_sim_py.py` 独立复跑；含 self_check() 对真实源码做静态断言防漂移） | 58838 B | `e6773b725269309ec2c562f69ecace4ec42bc4b3d988d130ca445aa34e19d96a` |
-| `_gen_dispatch_sim_py.py` | 上项的生成器：证明嵌入的 dss_RemoteTrigger.js / doPost / 3 个处理函数均来自真实文件、零手抄；self_check() 23 条源码静态断言，漂移即 exit 2 | 45238 B | `e66139a2f0744068e0b02481d178c16896921c6965d358408576fab7177a0706` |
+| `dispatch_sim_py.py` | 纯 Python 语义复刻的分发层仿真（94/94，用例名/编号与 dispatch_sim_test.js 对齐；无 Node 依赖，Tom 可在 macOS 直接 `python3 dispatch_sim_py.py` 复跑；属【补充测试】，非 JavaScript 运行时执行真实分发器）。self_check() 25 条静态断言（测试开始时调用一次，对嵌入源码做关键片段断言防漂移） | 58838 B | `e6773b725269309ec2c562f69ecace4ec42bc4b3d988d130ca445aa34e19d96a` |
+| `_gen_dispatch_sim_py.py` | 上项的生成器：证明嵌入的 dss_RemoteTrigger.js / doPost / 3 个处理函数均来自真实文件、零手抄；self_check() 25 条源码静态断言（测试开始时执行一次，片段断言，漂移即 exit 2） | 45238 B | `e66139a2f0744068e0b02481d178c16896921c6965d358408576fab7177a0706` |
 | `rotate_remote_token_client.py` | 客户端 v6（v9 服务端改动不要求客户端变更；字段对齐 token + capability 归属/TTL + 在途判定 + 权限收紧 + ACL 读回失败关闭 + 写前暂存） | 26064 B | `fea761d82aa70973d10ccf597d1250aa6cd211bc60555c777480d5db7f5ea8a2` |
 | `rotation_logic_test.py` | Python 逻辑测试 v9（Windows 128/128、macOS 127/127；含 T26d–T26k 及 v9 新增 T26m/T26n/T26o 空白负向；缺输入 exit 2） | 43497 B | `a28253aa7e12002b821da7421046a90afd08ed4824b6f37bbc1133ad1c6db429` |
 | `deployment_evidence_20260926.json` | rotation_logic_test.py 的必需输入（真实只读枚举产物） | 3394 B | `97e59318bf71ea16bd71a3b907eae88b79f9c8d61c6093b5e65371d8de424788` |
@@ -85,8 +85,8 @@
 | `STATE.json` | T1-B 交付状态本体 | 81235 B | `a99977c83f04afdf4a1edaf4f1baaa392fb874a84baf674d6dec31bf2af14f42` |
 | `STATE.json.sha256` | 侧车（哈希内容） | 77 B | `373fc436b83d1889ac7b18a29b0b4b88147aeaf2c06332f566d06643628a2a1b` |
 | `STATE.json.sha1` | 侧车（哈希内容） | 53 B | `935584cecee14d07b9c10c2add14a84e45dfbe5662c66d56a5deae48f17eb34a` |
-| `_build_manifest.py` | 清单构建/核验脚本（v9.1 起随包分发，回应 Tom 第八轮：说明引用的脚本必须在包内；`verify` 为离线自包含，直接解析本清单与同目录文件比对，无需网络/包外文件） | 26595 B | `3e1b051d8e274e3303191373a2a9884e64de10c26dba37368ee2399777fca1ad` |
-| `ALL_IN_ONE_20260928.txt` | 单文件合集（备用，内容=上表文件按序拼接） | 579962 B | `9f69b14834e049294445325be2637638054a98001eed9dded84717679f615727` |
+| `_build_manifest.py` | 清单构建/核验脚本（v9.1 起随包分发，回应 Tom 第八轮：说明引用的脚本必须在包内；`verify` 为离线自包含，直接解析本清单与同目录文件比对，无需网络/包外文件） | 29239 B | `288fe16a76f38ae0ec20acb1b90e290ae116c59c2d25234d4f92d7595b6cd1ef` |
+| `ALL_IN_ONE_20260928.txt` | 单文件合集（备用，内容=上表文件按序拼接） | 582606 B | `e2addbdd758f180dd0e194759df12ed37646d0870687f5dd397c498795255b0c` |
 
 ---
 
@@ -116,7 +116,7 @@
 node dispatch_sim_test.js          # 期望：PASS 94 / 94，退出码 0
 
 # 1b) 纯 Python 分发仿真（无需 node，macOS 直接可跑）
-python3 dispatch_sim_py.py        # 期望：PASS 94 / 94，退出码 0（self_check 静态断言防漂移）
+python3 dispatch_sim_py.py        # 期望：PASS 94 / 94，退出码 0（self_check：25 条静态断言，测试开始时执行一次，对嵌入源码做关键片段断言防漂移）
 
 # 2) 逻辑层仿真（需要 python 3）
 python rotation_logic_test.py      # 期望：PASS 128 / 128（Windows）或 127 / 127（macOS），退出码 0
@@ -140,4 +140,18 @@ cd chk && git init -q . && git apply --check -p1 ../rotation_deploy_diff_2026092
 - 凭证事件维持 **OPEN**：T2 曾现于 URL 查询串、Google 服务端日志可见性未证伪；须待方案 §5/§6/§7 核验通过方可降级。
 - T1-B B 列修复批准数维持 **0**；本包不涉及 T1-B 修复。
 - **v9 仍为待审核方案**。Tom 审核通过 ≠ 生产授权；真实轮换须经 Rita / 生产负责人单独授权。
-- 128/128（Windows）与 94/94 均为 Rita 侧自测结果；**94/94 现已可由 Tom 在 macOS 用纯 Python 仿真 `dispatch_sim_py.py` 独立复现（无需 Node）**。
+- 128/128（Windows）与 94/94（Node）均为 Rita 侧自测结果；**94/94 现已可由 Tom 在 macOS 用纯 Python 仿真 `dispatch_sim_py.py` 复现（无需 Node）**。`dispatch_sim_py.py` 为**补充测试 / 语义复刻**（非 JavaScript 运行时），定位见本清单顶部与 §九。
+
+---
+
+## 九、v9.2 复审记录（Tom，2026-09-29）
+
+**结论**：v9.2 的清单核验与 Python 仿真在本机通过；该仿真**定位为补充测试**（语义复刻、非 JS 运行时），**不视为 Node 测试的完全等价替代**；v9 代码修订范围的复审结论不变。**不构成生产轮换授权、不构成 T1-B B 列修复授权；T1-B 生产写入批准数仍为 0。**
+
+Tom 本机复核：`python3 _build_manifest.py verify` → 24/24 PASS；`python3 dispatch_sim_py.py` → 94/94 PASS；`python3 rotation_logic_test.py` → 127/127 PASS。本机无 Node，未独立运行 `dispatch_sim_test.js`。
+
+**两点文案/材料修正（已落实于本清单 v9.2.1）：**
+1. `self_check()` 实为 **25 条**静态断言（此前称 23 条有误）；在**测试开始时调用一次**（非每个用例分别执行）；检查方式是对**嵌入源码文本做关键片段断言**，**非完整字节哈希验证**。
+2. Python 仿真与 Node fixture 的**过期时间错误提示存在一字之差**：Python 仿真提示含"空白"（与 v9 服务端 `rotation_action_actual.gs` 第 197 行一致）；而 Node 测试 `dispatch_sim_test.js` 内嵌的处理函数快照（第 310 行）缺"空白"——该 Node fixture 早于 v9 这一措辞，属**已知滞后**。两版对全部 94 用例的**结构化结果完全一致**（断言仅校验 `ok`/`expired`/`令牌未改`/`capability 已清理`，从不依赖错误字符串原文），故判定不受影响。
+
+**建议（非本轮必需，供后续）**：将 Node fixture 从当前 v9 服务端源码重新生成，使其过期提示也含"空白"，即可消除该文本差异、令两套测试材料逐字一致。
